@@ -1,7 +1,3 @@
-# 現在のStreamlitコードを 'app.py' として保存します
-# このファイルは、現在のノートブックの状態に合わせて更新されます。
-with open('app.py', 'w') as f:
-    f.write('''
 import streamlit as st
 import pandas as pd
 from datetime import datetime
@@ -13,25 +9,22 @@ st.set_page_config(page_title="香りのしごとプロジェクト記録入力"
 st.title("🌿 香りのしごとプロジェクト 記録システム")
 st.caption("頂いた花から、自分たちが育てたハーブ・ドライフラワーへ")
 
-# --- リスト読み込み用の関数（ここを修正しました） ---
+# --- リスト読み込み用の関数 ---
 def load_list(file_name):
     try:
-        # ExcelでもCSVでも読み込めるようにし、見出しがなくても1列目を取得する設定
-        if file_name.endswith('.xlsx'):
-            df = pd.read_excel(file_name, header=None)
-        else:
-            df = pd.read_csv(file_name, header=None, encoding='utf-8-sig')
-        return df[0].dropna().tolist() # 1列目の名前をリストにする
-    except Exception as e:
-        # ファイル名が.xlsxでも、実体がCSVの場合があるための再トライ
+        # まずはCSVとして読み込み（ヘッダーなし）
+        df = pd.read_csv(file_name, header=None, encoding='utf-8-sig')
+        return df[0].dropna().tolist()
+    except:
         try:
-            df = pd.read_csv(file_name, header=None, encoding='utf-8-sig')
+            # CSVでダメならExcelとして読み込み
+            df = pd.read_excel(file_name, header=None)
             return df[0].dropna().tolist()
         except:
             st.warning(f"ファイル {file_name} が読み込めませんでした。")
             return []
 
-# 各リストの読み込み
+# 各リストの読み込み（ファイル名はGitHub上の名前に合わせています）
 staff_names = load_list("職員名.xlsx")
 male_users = load_list("男性利用者.xlsx")
 female_users = load_list("女性利用者.xlsx")
