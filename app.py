@@ -7,45 +7,40 @@ import os
 st.set_page_config(page_title="香りのしごとプロジェクト記録入力", layout="wide")
 
 st.title("🌿 香りのしごとプロジェクト 記録システム")
-st.caption("頂いた花から、自分たちが育てたハーブ・ドライフラワーへ")
+st.caption("撮影した写真はダウンロードボタンでご自身の端末に保存してください")
 
 # --- リスト読み込み用の関数 ---
 def load_list(file_name):
     try:
-        # まずはCSVとして読み込み（ヘッダーなし）
         df = pd.read_csv(file_name, header=None, encoding='utf-8-sig')
         return df[0].dropna().tolist()
     except:
         try:
-            # CSVでダメならExcelとして読み込み
             df = pd.read_excel(file_name, header=None)
             return df[0].dropna().tolist()
         except:
-            st.warning(f"ファイル {file_name} が読み込めませんでした。")
             return []
 
-# 各リストの読み込み（ファイル名はGitHub上の名前に合わせています）
+# 各リストの読み込み
 staff_names = load_list("職員名.xlsx")
 male_users = load_list("男性利用者.xlsx")
 female_users = load_list("女性利用者.xlsx")
 all_users = sorted(male_users + female_users)
 
-# 名簿が空の場合の予備
 if not staff_names: staff_names = ["（名簿を読み込めませんでした）"]
 if not all_users: all_users = ["（名簿を読み込めませんでした）"]
 
-# 保存用フォルダ/ファイルの作成
+# 保存用フォルダの作成
 SAVE_DIR = "records"
 if not os.path.exists(SAVE_DIR):
     os.makedirs(SAVE_DIR)
 
 DAILY_LOG_FILE = f"{SAVE_DIR}/daily_report.csv"
-INDIVIDUAL_LOG_FILE = f"{SAVE_DIR}/individual_report.csv"
 
-# サイドメニュー
-menu = st.sidebar.radio("メニューを選択", ["日報（全体・プロジェクト）", "個別支援記録（利用者別）", "過去の記録を確認"])
+# メニュー（今回は日報に集中）
+menu = st.sidebar.radio("メニューを選択", ["日報（全体・プロジェクト）", "過去の記録を確認"])
 
-# --- モード1：日報（全体） ---
+# --- 日報入力モード ---
 if menu == "日報（全体・プロジェクト）":
     st.header("📝 プロジェクト日報入力")
     
@@ -59,10 +54,13 @@ if menu == "日報（全体・プロジェクト）":
             staff = st.selectbox("記入職員名", staff_names)
 
         phase = st.multiselect("本日の工程", ["①栽培（屋外）", "②加工（室内）", "③表現（デザイン）", "④販売（接客）"])
-        
-        star_user = st.selectbox("本日の「主役」（特に輝いていた利用者様）", ["選択してください"] + all_users)
+        star_user = st.selectbox("本日の「主役」", ["選択してください"] + all_users)
         activity_detail = st.text_area("活動内容の詳細")
-        
+
+        # --- カメラ機能（これだけに絞りました） ---
+        st.subheader("📸 本日の写真を撮影（任意）")
+        img_file = st.camera_input("カメラを起動")
+
         st.subheader("✅ 安全・衛生チェック")
         c1, c2, c3 = st.columns(3)
         safety_1 = c1.checkbox("水分補給・休憩の実施")
@@ -75,52 +73,28 @@ if menu == "日報（全体・プロジェクト）":
             new_data = pd.DataFrame([{
                 "日付": date, "天候": weather, "記入者": staff, "工程": ", ".join(phase),
                 "本日の主役": star_user, "内容": activity_detail, 
-                "安全チェック": f"水分:{safety_1}/道具:{safety_2}/衛生:{safety_3}"
+                "安全チェック": f"水分:{safety_1}/道具:{safety_2}/衛生:{safety_3}",
+                "画像撮影": "あり" if img_file else "なし"
             }])
             new_data.to_csv(DAILY_LOG_FILE, index=False, mode='a', header=not os.path.exists(DAILY_LOG_FILE), encoding='utf-8-sig')
-            st.success("日報を保存しました！")
+            st.success("日報（テキスト）を保存しました！")
 
-# --- モード2：個別支援記録 ---
-elif menu == "個別支援記録（利用者別）":
-    st.header("👤 利用者個別 支援記録")
-    
-    with st.form("individual_form"):
-        col1, col2 = st.columns(2)
-        with col1:
-            u_date = st.date_input("日付", datetime.now())
-            u_name = st.selectbox("利用者氏名", ["選択してください"] + all_users)
-        with col2:
-            u_category = st.selectbox("重点を置いた適性", ["栽培（体力・ルーティン）", "加工（器用さ・丁寧さ）", "表現（色彩・創作）", "販売（挨拶・交流）"])
-        
-        u_observation = st.text_area("本日の様子・成長が見られた点")
-        u_support = st.text_area("具体的な支援内容（環境調整など）")
-        
-        u_submitted = st.form_submit_button("個別記録を保存する")
-        
-        if u_submitted:
-            new_u_data = pd.DataFrame([{
-                "日付": u_date, "氏名": u_name, "項目": u_category, 
-                "様子・成長": u_observation, "支援内容": u_support
-            }])
-            new_u_data.to_csv(INDIVIDUAL_LOG_FILE, index=False, mode='a', header=not os.path.exists(INDIVIDUAL_LOG_FILE), encoding='utf-8-sig')
-            st.success(f"{u_name}様の記録を保存しました。")
+    # 撮影された写真がある場合、フォームの下に表示
+    if img_file:
+        st.write("---")
+        st.subheader("🖼 撮影された写真の確認")
+        st.image(img_file, width=400)
+        # ファイル名を「日付_記入者名.jpg」にしてダウンロードしやすく
+        file_name_for_save = f"kaori_{date}_{staff}.jpg"
+        st.download_button("この写真を端末にダウンロード", img_file, file_name=file_name_for_save, mime="image/jpeg")
 
-# --- モード3：データ確認 ---
+# --- データ確認モード ---
 elif menu == "過去の記録を確認":
-    st.header("📊 記録の確認と出力")
-    
-    st.subheader("日報データ")
+    st.header("📊 記録の確認")
     if os.path.exists(DAILY_LOG_FILE):
         df_daily = pd.read_csv(DAILY_LOG_FILE)
         st.dataframe(df_daily)
-        st.download_button("日報CSVをダウンロード", df_daily.to_csv(index=False, encoding='utf-8-sig'), "daily_reports.csv", "text/csv")
+        csv_daily = df_daily.to_csv(index=False, encoding='utf-8-sig')
+        st.download_button("CSVをダウンロード", csv_daily, "daily_reports.csv", "text/csv")
     else:
-        st.info("日報のデータはまだありません。")
-
-    st.subheader("個別支援データ")
-    if os.path.exists(INDIVIDUAL_LOG_FILE):
-        df_indiv = pd.read_csv(INDIVIDUAL_LOG_FILE)
-        st.dataframe(df_indiv)
-        st.download_button("個別記録CSVをダウンロード", df_indiv.to_csv(index=False, encoding='utf-8-sig'), "individual_reports.csv", "text/csv")
-    else:
-        st.info("個別記録のデータはまだありません。")
+        st.info("まだ記録はありません。")
